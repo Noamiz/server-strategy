@@ -6,7 +6,7 @@ This service is responsible for:
 
 - Exposing HTTP APIs (starting with authentication).
 - Using shared DTOs and contracts from [`common-strategy`](https://github.com/Noamiz/common-strategy).
-- Later: orchestrating business logic and persistence to PostgreSQL.
+- Orchestrating business logic and, later, persistence to PostgreSQL.
 
 ---
 
@@ -25,22 +25,16 @@ This service is responsible for:
 
 ## Architecture
 
-- Runtime:
-  - Node.js (LTS recommended, e.g. 20+)
-  - Express for HTTP routing
-- Language:
-  - TypeScript
-- Tests:
-  - Vitest + Supertest
-- Linting:
-  - ESLint + @typescript-eslint
-- Shared types:
-  - `common-strategy` (git dependency for now)
+- **Runtime:** Node.js LTS (20+ recommended) with Express for HTTP routing.
+- **Language:** TypeScript.
+- **Testing:** Vitest + Supertest.
+- **Linting:** ESLint + `@typescript-eslint`.
+- **Shared types:** `common-strategy` (git dependency).
 
-The server exposes JSON HTTP endpoints and always returns **`Result<T>`** bodies as defined in `common-strategy`:
+All HTTP responses follow the `Result<T>` contract from `common-strategy`:
 
-- On success: `{ ok: true, data: T }`
-- On error: `{ ok: false, error: ApiError }`
+- Success → `{ ok: true, data: T }`
+- Error → `{ ok: false, error: ApiError }`
 
 ---
 
@@ -50,38 +44,24 @@ The server exposes JSON HTTP endpoints and always returns **`Result<T>`** bodies
 
 Endpoints under `/auth`:
 
-1. `POST /auth/send-code`
-   - Request body: `AuthSendCodeRequest`  
-     (from `common-strategy`)
-   - Behavior (MVP):
-     - Validates `email`.
-     - Stores an in-memory `{ email, code, expiresAt, attempts }` record.
-     - Returns `Result<AuthSendCodeResponse>`:
-       - `data.expiresAt`: when the code expires
-       - `data.maskedDestination`: masked email (e.g. `u***@example.com`)
-     - Error cases:
-       - Invalid/missing email → 400 with `VALIDATION_ERROR`.
+1. **`POST /auth/send-code`**
+   - Request body: `AuthSendCodeRequest`.
+   - Validates the email, stores `{ email, code, expiresAt, attempts }` in memory, and returns `Result<AuthSendCodeResponse>` with expiration metadata and a masked destination.
+   - Invalid or missing email returns HTTP 400 with `VALIDATION_ERROR`.
 
-2. `POST /auth/verify-code`
-   - Request body: `AuthVerifyCodeRequest`
-   - Behavior (MVP):
-     - Validates `email` and `code` (6-digit string).
-     - Checks the in-memory verification store.
-     - On success:
-       - Returns `Result<AuthVerifyCodeSuccess>`:
-         - `data.user`: `User` DTO
-         - `data.token`: `AuthToken` DTO
-     - Error cases:
-       - Expired code → 400 with `VALIDATION_ERROR`.
-       - Wrong code → 401 with `UNAUTHORIZED`.
-       - Too many attempts → 429 with `TOO_MANY_REQUESTS`.
+2. **`POST /auth/verify-code`**
+   - Request body: `AuthVerifyCodeRequest`.
+   - Validates `email` and `code`, checks the in-memory store, and on success returns `Result<AuthVerifyCodeSuccess>` (`user` + `token` DTOs).
+   - Error cases:
+     - Expired code → 400 `VALIDATION_ERROR`
+     - Wrong code → 401 `UNAUTHORIZED`
+     - Too many attempts → 429 `TOO_MANY_REQUESTS`
 
-3. `GET /auth/me`
-   - Behavior (MVP):
-     - Returns a dummy `User` in `Result<AuthMeResponse>` with HTTP 200.
-     - TODO: read token from headers and return real authenticated user.
+3. **`GET /auth/me`**
+   - Returns a placeholder `User` via `Result<AuthMeResponse>` (HTTP 200).
+   - TODO: read auth token from headers and return the real user.
 
-See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)` for full contract details.
+See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)` for full details.
 
 ---
 
@@ -89,26 +69,25 @@ See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-d
 
 ### Prerequisites
 
-- Node.js LTS (e.g. v20+)
-- Yarn (classic) installed globally or via corepack
+- Node.js LTS (20+).
+- Yarn classic (global install or via corepack).
 
-### Install dependencies
+### Install & Run
 
-From the repo root:
-
-````bash
+```bash
 yarn install
-Run in development
-bash
-Copy code
 yarn dev
-By default the server listens on http://localhost:4000 (or PORT from env).
+```
 
-Scripts
-Defined in package.json:
+By default the server listens on `http://localhost:4000` (override via `PORT`).
 
-jsonc
-Copy code
+---
+
+## Scripts
+
+Defined in `package.json`:
+
+```jsonc
 {
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
@@ -118,28 +97,29 @@ Copy code
     "lint": "eslint src --ext .ts"
   }
 }
+```
+
 Common workflows:
 
-yarn dev – start dev server with hot reload
+- `yarn dev` – start dev server with hot reload.
+- `yarn test` – run Vitest + Supertest suite.
+- `yarn lint` – run ESLint.
+- `yarn build` – compile to `dist/` for production.
 
-yarn test – run test suite (Vitest + Supertest)
+---
 
-yarn lint – run ESLint
+## Project Structure
 
-yarn build – compile TypeScript to dist/ for production
-
-Project Structure
-text
-Copy code
+```
 server-strategy/
   src/
-    app.ts             # Express app, JSON middleware, route registration
-    server.ts          # HTTP server bootstrap (listens on PORT)
+    app.ts              # Express app, JSON middleware, route registration
+    server.ts           # HTTP server bootstrap (listens on PORT)
     routes/
-      authRoutes.ts    # /auth/send-code, /auth/verify-code, /auth/me
+      authRoutes.ts     # /auth/send-code, /auth/verify-code, /auth/me
     auth/
-      validation.ts    # Hand-rolled validators for auth payloads
-      codeStore.ts     # In-memory verification code store (MVP)
+      validation.ts     # Hand-rolled validators for auth payloads
+      codeStore.ts      # In-memory verification code store (MVP)
     __tests__/
       authRoutes.test.ts  # Integration tests for the /auth endpoints
   tsconfig.json
@@ -150,117 +130,97 @@ server-strategy/
   .gitignore
   package.json
   README.md
-  SYSTEM_SYNC.md       # High-level system sync doc for AI tools and humans
-As the product evolves, more domain modules and routes will be added under src/.
+  SYSTEM_SYNC.md         # High-level sync doc for AI tools and humans
+```
 
-Testing
-We follow the overall testing strategy defined in Confluence (6.1 – Testing Strategy & Quality Gates).
-
-Currently:
-
-Integration tests:
-
-src/__tests__/authRoutes.test.ts:
-
-Exercises /auth/send-code, /auth/verify-code, /auth/me.
-
-Asserts HTTP status codes and Result<T> shapes using common-strategy types.
-
-yarn test should always be green before merging.
-
-Future work:
-
-Add unit tests around validation.ts and codeStore.ts.
-
-Add integration tests for future domain endpoints.
-
-Add contract tests to ensure responses always match shared DTOs.
-
-Related Repositories
-common-strategy
-
-gateway-strategy
-
-web-client-strategy
-
-mobile-client-strategy
-
-ai-strategy
-
-This service depends on common-strategy for shared types and contracts, and will be consumed by the web/mobile clients.
-
-Documentation
-Full system-level documentation lives in Confluence under:
-
-End to End Company Products
-
-Relevant sections:
-
-01 – Vision & Strategy
-
-02 – System Architecture
-
-03 – Repositories → server-strategy
-
-05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)
-
-06 – Operations → 6.1 – Testing Strategy & Quality Gates
-
-06 – Operations → 6.2 – AI-Orchestrated Development (Target Vision)
-
-If this README and Confluence ever disagree, Confluence is the source of truth and this file should be updated.
-
-perl
-Copy code
+As the product evolves, additional domain modules and routes will land under `src/`.
 
 ---
 
-## 4) Cursor prompt to create SYSTEM_SYNC + README
+## Testing
 
-Now, to let the **server-strategy** Cursor agent do the actual file work, paste this into that repo’s agent:
+We follow the testing strategy defined in Confluence (`6.1 – Testing Strategy & Quality Gates`).
 
-> We’re in the `server-strategy` repo.
-> Right now, `README.md` is empty and there is no `SYSTEM_SYNC.md`.
->
-> Please do the following:
->
-> 1. **Create or overwrite `SYSTEM_SYNC.md`** in the repo root with the content I’m about to give you.
-> 2. **Overwrite `README.md`** in the repo root with the content I’m about to give you.
-> 3. After modifying these files, run:
->    - `yarn build`
->    - `yarn test`
->    - `yarn lint`
->    to ensure nothing broke (they should still be ✅).
-> 4. Summarize what you changed and confirm the statuses of `yarn build`, `yarn test`, and `yarn lint`.
->
-> Here is the desired content for `SYSTEM_SYNC.md`:
->
+Current coverage:
+
+- `src/__tests__/authRoutes.test.ts`
+  - Exercises `/auth/send-code`, `/auth/verify-code`, `/auth/me`.
+  - Asserts HTTP status codes and `Result<T>` shapes using shared DTOs.
+
+`yarn test` must be green before merging.
+
+Future enhancements:
+
+- Unit tests for `validation.ts` and `codeStore.ts`.
+- Integration tests for future domain endpoints.
+- Contract tests to keep responses aligned with shared DTOs.
+
+---
+
+## Related Repositories
+
+- `common-strategy`
+- `gateway-strategy`
+- `web-client-strategy`
+- `mobile-client-strategy`
+- `ai-strategy`
+
+This service depends on `common-strategy` and is consumed by the web/mobile clients.
+
+---
+
+## Documentation
+
+System-level docs live in Confluence (`End to End Company Products`). Relevant sections:
+
+- `01 – Vision & Strategy`
+- `02 – System Architecture`
+- `03 – Repositories → server-strategy`
+- `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)`
+- `06 – Operations → 6.1 – Testing Strategy & Quality Gates`
+- `06 – Operations → 6.2 – AI-Orchestrated Development (Target Vision)`
+
+If this README ever diverges from Confluence, treat Confluence as the source of truth and update this file.
+
+---
+
+## Cursor prompt to create SYSTEM_SYNC + README
+
+To reproduce the documentation setup via Cursor, paste the following into the `server-strategy` repo agent:
+
+> We’re in the `server-strategy` repo.  
+> Right now, `README.md` is empty and there is no `SYSTEM_SYNC.md`.  
+>  
+> Please do the following:  
+> 1. **Create or overwrite `SYSTEM_SYNC.md`** in the repo root with the content I’m about to give you.  
+> 2. **Overwrite `README.md`** in the repo root with the content I’m about to give you.  
+> 3. After modifying these files, run:  
+>    - `yarn build`  
+>    - `yarn test`  
+>    - `yarn lint`  
+>    to ensure nothing broke (they should still be ✅).  
+> 4. Summarize what you changed and confirm the statuses of `yarn build`, `yarn test`, and `yarn lint`.  
+>  
+> Here is the desired content for `SYSTEM_SYNC.md`:  
 > ```md
 > [PASTE THE SYSTEM_SYNC.md CONTENT FROM ABOVE HERE]
-> ```
->
-> Here is the desired content for `README.md`:
->
+> ```  
+>  
+> Here is the desired content for `README.md`:  
 > ```md
 > [PASTE THE README.md CONTENT FROM ABOVE HERE]
-> ```
->
-> Please make sure the files are created exactly with this content (adjusting only line endings/formatting if necessary).
->
-> Do not change any TypeScript or config files in this step unless required to keep build/tests green.
+> ```  
+>  
+> Please make sure the files are created exactly with this content (adjusting only line endings/formatting if necessary).  
+> Do not change any TypeScript or config files in this step unless required to keep build/tests green.  
+>  
+> Once that’s done and green, we’ll have:  
+> - `common-strategy`: contracts + docs.  
+> - `server-strategy`: auth endpoints + tests + docs.  
+>  
+> Then we can pick our next “big move”:  
+> - Start the **`gateway-strategy` skeleton** (real-time hub).  
+> - Or sketch **web-client / mobile-client** auth UIs that consume these endpoints.  
+>  
+> We can decide after you confirm the docs step is done.
 
----
-
-Once that’s done and green, we’ll have:
-
-- `common-strategy`: contracts + docs.
-- `server-strategy`: auth endpoints + tests + docs.
-
-Then we can choose our next “big move”:
-
-- Start the **`gateway-strategy` skeleton** (real-time hub).
-- Or sketch **web-client / mobile-client** auth UIs that consume these endpoints.
-
-We can pick that after you confirm the docs step is done.
-::contentReference[oaicite:0]{index=0}
-````
