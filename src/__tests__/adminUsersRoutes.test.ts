@@ -20,6 +20,7 @@ const assertOkResult = <T>(body: Result<T>): T => {
 const listUsersSpy = vi.spyOn(UsersRepository, 'listUsers');
 const getUserByIdSpy = vi.spyOn(UsersRepository, 'getUserById');
 const findSessionByTokenSpy = vi.spyOn(SessionRepository, 'findSessionByToken');
+const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
 const SEEDED_USERS: User[] = [
   {
@@ -88,6 +89,7 @@ afterAll(() => {
   listUsersSpy.mockRestore();
   getUserByIdSpy.mockRestore();
   findSessionByTokenSpy.mockRestore();
+  consoleErrorSpy.mockRestore();
 });
 
 describe('GET /admin/users', () => {

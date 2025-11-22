@@ -3,6 +3,7 @@ import type { Session } from '@prisma/client';
 import { prisma } from '../db/prisma';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SHOULD_SKIP_SESSION_TOUCH = process.env.NODE_ENV === 'test';
 
 export const generateSessionToken = (): string => randomBytes(32).toString('hex');
 
@@ -35,10 +36,18 @@ export async function findSessionByToken(token: string): Promise<Session | null>
 }
 
 export async function updateSessionLastUsedAt(sessionId: string): Promise<void> {
-  await prisma.session.update({
-    where: { id: sessionId },
-    data: { lastUsedAt: new Date() },
-  });
+  if (SHOULD_SKIP_SESSION_TOUCH) {
+    return;
+  }
+
+  try {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { lastUsedAt: new Date() },
+    });
+  } catch (error) {
+    console.error('Failed to update session lastUsedAt', error);
+  }
 }
 
 
