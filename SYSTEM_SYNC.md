@@ -1,5 +1,7 @@
 # System Sync – End to End Company Products
 
+This repo is one of the 7 core repos in the secondbase kit.
+
 ## 1. Purpose of This File
 
 This document gives **AI coding tools (Cursor, ChatGPT, etc.)** and developers a compact overview of:

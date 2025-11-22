@@ -1,5 +1,7 @@
 # server-strategy
 
+Part of the secondbase kit – a reusable, always-modern company-in-a-box.
+
 Core **Node.js + TypeScript HTTP API server** for the _End to End Company Products_ system.
 
 This service is responsible for:
@@ -122,8 +124,8 @@ Defined in `package.json`:
     "test": "vitest",
     "lint": "eslint src --ext .ts",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
-  }
+    "db:seed": "prisma db seed",
+  },
 }
 ```
 
@@ -235,38 +237,42 @@ If this README ever diverges from Confluence, treat Confluence as the source of 
 To reproduce the documentation setup via Cursor, paste the following into the `server-strategy` repo agent:
 
 > We’re in the `server-strategy` repo.  
-> Right now, `README.md` is empty and there is no `SYSTEM_SYNC.md`.  
->  
-> Please do the following:  
-> 1. **Create or overwrite `SYSTEM_SYNC.md`** in the repo root with the content I’m about to give you.  
-> 2. **Overwrite `README.md`** in the repo root with the content I’m about to give you.  
-> 3. After modifying these files, run:  
->    - `yarn build`  
->    - `yarn test`  
+> Right now, `README.md` is empty and there is no `SYSTEM_SYNC.md`.
+>
+> Please do the following:
+>
+> 1. **Create or overwrite `SYSTEM_SYNC.md`** in the repo root with the content I’m about to give you.
+> 2. **Overwrite `README.md`** in the repo root with the content I’m about to give you.
+> 3. After modifying these files, run:
+>    - `yarn build`
+>    - `yarn test`
 >    - `yarn lint`  
->    to ensure nothing broke (they should still be ✅).  
-> 4. Summarize what you changed and confirm the statuses of `yarn build`, `yarn test`, and `yarn lint`.  
->  
-> Here is the desired content for `SYSTEM_SYNC.md`:  
+>      to ensure nothing broke (they should still be ✅).
+> 4. Summarize what you changed and confirm the statuses of `yarn build`, `yarn test`, and `yarn lint`.
+>
+> Here is the desired content for `SYSTEM_SYNC.md`:
+>
 > ```md
 > [PASTE THE SYSTEM_SYNC.md CONTENT FROM ABOVE HERE]
-> ```  
->  
-> Here is the desired content for `README.md`:  
+> ```
+>
+> Here is the desired content for `README.md`:
+>
 > ```md
 > [PASTE THE README.md CONTENT FROM ABOVE HERE]
-> ```  
->  
+> ```
+>
 > Please make sure the files are created exactly with this content (adjusting only line endings/formatting if necessary).  
-> Do not change any TypeScript or config files in this step unless required to keep build/tests green.  
->  
-> Once that’s done and green, we’ll have:  
-> - `common-strategy`: contracts + docs.  
-> - `server-strategy`: auth endpoints + tests + docs.  
->  
-> Then we can pick our next “big move”:  
-> - Start the **`gateway-strategy` skeleton** (real-time hub).  
-> - Or sketch **web-client / mobile-client** auth UIs that consume these endpoints.  
->  
+> Do not change any TypeScript or config files in this step unless required to keep build/tests green.
+>
+> Once that’s done and green, we’ll have:
+>
+> - `common-strategy`: contracts + docs.
+> - `server-strategy`: auth endpoints + tests + docs.
+>
+> Then we can pick our next “big move”:
+>
+> - Start the **`gateway-strategy` skeleton** (real-time hub).
+> - Or sketch **web-client / mobile-client** auth UIs that consume these endpoints.
+>
 > We can decide after you confirm the docs step is done.
-
