@@ -64,13 +64,16 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
   - Email + 6-digit code login/registration flow.
   - Token issuance and validation (AuthToken from `common-strategy`).
   - `/auth/send-code`, `/auth/verify-code`, `/auth/me` endpoints.
+- **Admin tooling support**
+  - Read-only Users listing via `GET /admin/users` for `internal-tool-strategy`.
+  - Currently backed by an in-memory catalog; will migrate to PostgreSQL once available.
 
 - **Core business APIs** (later)
   - Domain-specific operations for the product (to be defined).
   - Will reuse DTOs from `common-strategy`.
 
 - **Persistence**
-  - Access to PostgreSQL (later; currently using in-memory storage for verification codes).
+  - Access to PostgreSQL (later; currently using in-memory storage for verification codes and admin users).
   - Data access layer and migrations.
 
 - **Contracts & error model**

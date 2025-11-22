@@ -63,6 +63,15 @@ Endpoints under `/auth`:
 
 See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)` for full details.
 
+### Admin Users (Read-only)
+
+Endpoints under `/admin`:
+
+1. **`GET /admin/users`**
+   - Returns `Result<UsersListResponse>` with an array of `User` objects sourced from an in-memory list.
+   - Powers the internal-tool-strategy experience while we design full admin flows.
+   - Read-only for now; authentication/authorization and PostgreSQL-backed persistence will follow.
+
 ---
 
 ## Getting Started
@@ -117,11 +126,17 @@ server-strategy/
     server.ts           # HTTP server bootstrap (listens on PORT)
     routes/
       authRoutes.ts     # /auth/send-code, /auth/verify-code, /auth/me
+      adminRoutes.ts    # /admin/users listing (read-only)
     auth/
       validation.ts     # Hand-rolled validators for auth payloads
       codeStore.ts      # In-memory verification code store (MVP)
+    admin/
+      inMemoryUsersStore.ts # Temporary in-memory admin users catalog
+    types/
+      admin.ts          # UsersListResponse type
     __tests__/
       authRoutes.test.ts  # Integration tests for the /auth endpoints
+      adminUsersRoutes.test.ts # Integration test for /admin/users
   tsconfig.json
   tsconfig.build.json
   vitest.config.ts
@@ -146,6 +161,9 @@ Current coverage:
 - `src/__tests__/authRoutes.test.ts`
   - Exercises `/auth/send-code`, `/auth/verify-code`, `/auth/me`.
   - Asserts HTTP status codes and `Result<T>` shapes using shared DTOs.
+- `src/__tests__/adminUsersRoutes.test.ts`
+  - Exercises `/admin/users` read-only listing backed by the in-memory store.
+  - Verifies the response uses the shared `Result<UsersListResponse>` contract.
 
 `yarn test` must be green before merging.
 
