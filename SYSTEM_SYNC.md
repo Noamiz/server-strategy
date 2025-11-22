@@ -75,7 +75,7 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
   - Will reuse DTOs from `common-strategy`.
 
 - **Persistence**
-  - PostgreSQL + Prisma for users and roles (migrations + seeds live under `prisma/`, config in `prisma.config.ts`).
+  - PostgreSQL + Prisma for users, roles, and sessions (migrations + seeds live under `prisma/`, config in `prisma.config.ts`).
   - OTP verification codes remain in-memory until the auth domain is persisted.
 
 - **Contracts & error model**
@@ -93,18 +93,20 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
 - `POST /auth/verify-code`
   - Validates email + code.
   - Verifies against in-memory store.
-  - On success → 200 with `Result<AuthVerifyCodeSuccess>` (User + AuthToken).
+  - On success → upserts the user in PostgreSQL, creates a Prisma-backed session (7-day expiry), and returns 200 with `Result<AuthVerifyCodeSuccess>` (`user` + `token`).
   - On expired code → 400 with `VALIDATION_ERROR`.
   - On wrong code → 401 with `UNAUTHORIZED`.
   - On too many attempts → 429 with `TOO_MANY_REQUESTS`.
 
 - `GET /auth/me`
-  - Currently returns a dummy User wrapped in `Result<AuthMeResponse>` (200).
-  - TODO: Wire real token-based auth (read token from headers, validate, return real user).
+  - Requires `Authorization: Bearer <token>`.
+  - Validates the session token against PostgreSQL and returns the authenticated user via `Result<AuthMeResponse>`.
+  - Missing/invalid/expired tokens → 401 with `UNAUTHORIZED`.
 
 **Current Admin Implementation (MVP)**:
 
 - `GET /admin/users`
+  - Protected by the auth middleware (requires valid session token).
   - Returns `Result<UsersListResponse>` backed by PostgreSQL via Prisma.
   - Seeds live in `prisma/seed.ts` and create four deterministic internal users + roles.
   - Read-only for now; authZ and extended admin flows remain future work.
@@ -123,7 +125,7 @@ For `server-strategy` specifically:
 
 - **Integration tests** (already started):
   - `/auth/...` endpoints via Supertest + Vitest.
-  - `/admin/users` read-only listing backed by Prisma (repository mocked in tests to avoid DB dependency).
+  - `/admin/users` read-only listing backed by Prisma (repository mocked in tests to avoid DB dependency) and guarded by the auth middleware.
   - Assert HTTP status codes and response shapes using shared DTOs from `common-strategy`.
 
 All PRs should keep:
@@ -157,6 +159,9 @@ If this file and Confluence ever disagree, **Confluence is the source of truth**
   - Prefer to first define/update DTOs in `common-strategy`.
   - Then implement endpoints here using those DTOs.
   - Add/extend integration tests to cover success and failure paths.
+- For authenticated endpoints:
+  - Reuse the shared auth middleware in `src/middleware/authMiddleware.ts`.
+  - Interact with sessions through `src/auth/sessionRepository.ts` (create/validate/update) rather than ad-hoc queries.
 - When persisting or reading user/role data:
   - Reuse the Prisma models defined in `prisma/schema.prisma`.
   - Add migrations via `yarn db:migrate` and keep seeds in `prisma/seed.ts` updated.

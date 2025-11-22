@@ -54,15 +54,19 @@ Endpoints under `/auth`:
 
 2. **`POST /auth/verify-code`**
    - Request body: `AuthVerifyCodeRequest`.
-   - Validates `email` and `code`, checks the in-memory store, and on success returns `Result<AuthVerifyCodeSuccess>` (`user` + `token` DTOs).
+   - Validates `email` and `code`, checks the in-memory store, and on success:
+     - Upserts the user record in PostgreSQL (if the email does not exist yet).
+     - Creates a `Session` row via Prisma and returns `Result<AuthVerifyCodeSuccess>` with the authenticated `user` + issued `token`.
+   - Tokens are valid for 7 days; clients must store them securely.
    - Error cases:
      - Expired code → 400 `VALIDATION_ERROR`
      - Wrong code → 401 `UNAUTHORIZED`
      - Too many attempts → 429 `TOO_MANY_REQUESTS`
 
 3. **`GET /auth/me`**
-   - Returns a placeholder `User` via `Result<AuthMeResponse>` (HTTP 200).
-   - TODO: read auth token from headers and return the real user.
+   - Requires `Authorization: Bearer <token>` header generated from `/auth/verify-code`.
+   - Validates the session token against PostgreSQL and returns `Result<AuthMeResponse>` with the authenticated user.
+   - Missing/invalid/expired tokens return 401 with `UNAUTHORIZED`.
 
 See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-digit Code)` for full details.
 
@@ -71,6 +75,7 @@ See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-d
 Endpoints under `/admin`:
 
 1. **`GET /admin/users`**
+   - Requires a valid session token (`Authorization: Bearer <token>`).
    - Returns `Result<UsersListResponse>` with an array of `User` objects sourced from PostgreSQL via Prisma.
    - Data is seeded via `yarn db:seed` with four deterministic internal users (admin, editor, viewer, ops).
    - Read-only for now; authentication/authorization and additional admin flows are still on the roadmap.
@@ -81,7 +86,14 @@ Endpoints under `/admin`:
 - **User fields:** `id`, `email`, `displayName`, `isActive`, `createdAt`, `updatedAt`.
 - **Role fields:** `id`, `name`, `description`, `isInternal`.
 - **Seeds:** four internal roles (`admin`, `editor`, `viewer`, `ops`) and four matching users wired together via `UserRole`.
-- **Usage today:** only `/admin/users` reads from this schema; OTP verification codes remain in-memory.
+- **Usage today:** `/admin/users` lists users, and `/auth/verify-code` upserts/fetches users before issuing sessions. OTP verification codes remain in-memory.
+
+### Sessions & Authorization
+
+- **Model:** `Session` table (Prisma) tracks `token`, `userId`, `expiresAt`, optional `lastUsedAt`, `userAgent`, and `ipAddress`.
+- **Creation:** `/auth/verify-code` generates a random token, stores it in `Session`, and returns the token envelope defined in `AuthVerifyCodeSuccess`.
+- **Validation:** `/auth/me` and `/admin/users` read the `Authorization: Bearer <token>` header, validate that the session exists and is not expired, and attach the corresponding user to the request.
+- **Expiry:** Tokens currently live for 7 days. Clients should re-authenticate via the OTP flow after expiry. Future work will add logout/revoke endpoints and refresh semantics.
 
 ---
 
@@ -190,10 +202,10 @@ Current coverage:
 
 - `src/__tests__/authRoutes.test.ts`
   - Exercises `/auth/send-code`, `/auth/verify-code`, `/auth/me`.
-  - Asserts HTTP status codes and `Result<T>` shapes using shared DTOs.
+  - Asserts HTTP status codes, Result<T> shapes, and auth/session behaviours (token issuance + protected `/auth/me`).
 - `src/__tests__/adminUsersRoutes.test.ts`
-  - Exercises `/admin/users` read-only listing backed by Prisma.
-  - Mocks repository interactions to verify success + DB error paths return the correct `Result<UsersListResponse>` shape.
+  - Exercises `/admin/users` read-only listing backed by Prisma and guarded by the auth middleware.
+  - Mocks repository interactions to verify success/auth failures + DB error paths return the correct `Result<UsersListResponse>` shape.
 
 `yarn test` must be green before merging.
 

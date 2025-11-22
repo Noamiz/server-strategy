@@ -7,7 +7,6 @@ import {
   type AuthVerifyCodeSuccess,
   type ErrorCode,
   type Result,
-  type User,
   type VerificationCode,
 } from 'common-strategy';
 import {
@@ -18,8 +17,14 @@ import {
   validateSendCodeRequest,
   validateVerifyCodeRequest,
 } from '../auth/validation';
+import {
+  createSession,
+  generateSessionToken,
+  getSessionExpiryDate,
+} from '../auth/sessionRepository';
+import { ensureUserByEmail } from '../admin/usersRepository';
+import { authMiddleware } from '../middleware/authMiddleware';
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
 const DUMMY_VERIFICATION_CODE: VerificationCode = '123456';
 
 const maskEmail = (email: string): string => {
@@ -34,6 +39,15 @@ const errorResult = (code: ErrorCode, message: string): Result<never> => {
     message,
   };
   return { ok: false, error };
+};
+
+const deriveDisplayName = (email: string): string => {
+  const [localPart = 'user'] = email.split('@');
+  if (!localPart) {
+    return 'User';
+  }
+
+  return localPart.charAt(0).toUpperCase() + localPart.slice(1);
 };
 
 const authRouter = Router();
@@ -58,7 +72,7 @@ authRouter.post('/send-code', (req, res) => {
   return res.status(200).json(response);
 });
 
-authRouter.post('/verify-code', (req, res) => {
+authRouter.post('/verify-code', async (req, res) => {
   const validation = validateVerifyCodeRequest(req.body);
   if (!validation.ok) {
     return res.status(400).json(validation);
@@ -86,48 +100,51 @@ authRouter.post('/verify-code', (req, res) => {
       .json(errorResult('UNAUTHORIZED', 'Invalid verification code.'));
   }
 
-  const user: User = {
-    id: 'user_dummy_id',
-    email,
-    displayName: 'Strategy User',
-    isActive: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
+  try {
+    const user = await ensureUserByEmail(email, deriveDisplayName(email));
 
-  const token: AuthToken = {
-    token: 'token_dummy_value',
-    issuedAt: Date.now(),
-    expiresAt: Date.now() + ONE_HOUR_MS,
-  };
+    const sessionToken = generateSessionToken();
+    const expiresAt = getSessionExpiryDate();
 
-  const response: Result<AuthVerifyCodeSuccess> = {
-    ok: true,
-    data: {
-      user,
-      token,
-    },
-  };
+    await createSession(user.id, sessionToken, expiresAt, {
+      userAgent: req.get('user-agent') ?? undefined,
+      ipAddress: req.ip,
+    });
 
-  return res.status(200).json(response);
+    const token: AuthToken = {
+      token: sessionToken,
+      issuedAt: Date.now(),
+      expiresAt: expiresAt.getTime(),
+    };
+
+    const response: Result<AuthVerifyCodeSuccess> = {
+      ok: true,
+      data: {
+        user,
+        token,
+      },
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to create session', error);
+    return res
+      .status(500)
+      .json(errorResult('INTERNAL_SERVER_ERROR', 'Unable to create session. Please try again.'));
+  }
 });
 
-authRouter.get('/me', (_req, res) => {
-  // TODO: read auth token from headers and validate it before returning the user profile.
-
-  const user: User = {
-    id: 'user_dummy_id',
-    email: 'user@example.com',
-    displayName: 'Strategy User',
-    isActive: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
+authRouter.get('/me', authMiddleware, (req, res) => {
+  if (!req.user) {
+    return res
+      .status(500)
+      .json(errorResult('INTERNAL_SERVER_ERROR', 'Unable to load authenticated user.'));
+  }
 
   const response: Result<AuthMeResponse> = {
     ok: true,
     data: {
-      user,
+      user: req.user,
     },
   };
 

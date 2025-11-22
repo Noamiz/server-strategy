@@ -2,10 +2,11 @@ import { Router } from 'express';
 import type { Result } from 'common-strategy';
 import type { UsersListResponse } from '../types/admin';
 import { listUsers } from '../admin/usersRepository';
+import { authMiddleware } from '../middleware/authMiddleware';
 
 export const adminRouter = Router();
 
-adminRouter.get('/users', async (_req, res) => {
+adminRouter.get('/users', authMiddleware, async (_req, res) => {
   try {
     const users = await listUsers();
 
