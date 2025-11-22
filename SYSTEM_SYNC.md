@@ -100,6 +100,13 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
   - Currently returns a dummy User wrapped in `Result<AuthMeResponse>` (200).
   - TODO: Wire real token-based auth (read token from headers, validate, return real user).
 
+**Current Admin Implementation (MVP)**:
+
+- `GET /admin/users`
+  - Returns `Result<UsersListResponse>` powered by the in-memory admin catalog.
+  - Intended for the internal-tool-strategy UI to display user metadata.
+  - Read-only for now; authZ and PostgreSQL persistence are future work.
+
 ---
 
 ## 4. Testing Expectations
@@ -114,6 +121,7 @@ For `server-strategy` specifically:
 
 - **Integration tests** (already started):
   - `/auth/...` endpoints via Supertest + Vitest.
+  - `/admin/users` read-only listing backed by the in-memory store.
   - Assert HTTP status codes and response shapes using shared DTOs from `common-strategy`.
 
 All PRs should keep:
