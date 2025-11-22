@@ -29,6 +29,7 @@ This service is responsible for:
 - **Language:** TypeScript.
 - **Testing:** Vitest + Supertest.
 - **Linting:** ESLint + `@typescript-eslint`.
+- **Persistence:** PostgreSQL + Prisma for users/roles (OTP codes remain in-memory for now).
 - **Shared types:** `common-strategy` (git dependency).
 
 All HTTP responses follow the `Result<T>` contract from `common-strategy`:
@@ -68,9 +69,17 @@ See Confluence: `05 – APIs & Contracts → 5.1 – Authentication (Email + 6-d
 Endpoints under `/admin`:
 
 1. **`GET /admin/users`**
-   - Returns `Result<UsersListResponse>` with an array of `User` objects sourced from an in-memory list.
-   - Powers the internal-tool-strategy experience while we design full admin flows.
-   - Read-only for now; authentication/authorization and PostgreSQL-backed persistence will follow.
+   - Returns `Result<UsersListResponse>` with an array of `User` objects sourced from PostgreSQL via Prisma.
+   - Data is seeded via `yarn db:seed` with four deterministic internal users (admin, editor, viewer, ops).
+   - Read-only for now; authentication/authorization and additional admin flows are still on the roadmap.
+
+### Users & Roles Data Model
+
+- **Tables:** `User`, `Role`, and `UserRole` join table.
+- **User fields:** `id`, `email`, `displayName`, `isActive`, `createdAt`, `updatedAt`.
+- **Role fields:** `id`, `name`, `description`, `isInternal`.
+- **Seeds:** four internal roles (`admin`, `editor`, `viewer`, `ops`) and four matching users wired together via `UserRole`.
+- **Usage today:** only `/admin/users` reads from this schema; OTP verification codes remain in-memory.
 
 ---
 
@@ -80,6 +89,14 @@ Endpoints under `/admin`:
 
 - Node.js LTS (20+).
 - Yarn classic (global install or via corepack).
+- PostgreSQL 14+ accessible via `DATABASE_URL` (see `env.example` for defaults).
+
+### Database Setup
+
+1. Copy `.env`: `cp env.example .env` and update the connection string if needed (the Prisma CLI reads it via `prisma.config.ts`).
+2. Ensure your Postgres instance has the target database (created automatically in most local setups).
+3. Run migrations: `yarn db:migrate`.
+4. Seed deterministic users/roles: `yarn db:seed`.
 
 ### Install & Run
 
@@ -103,7 +120,9 @@ Defined in `package.json`:
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "vitest",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed"
   }
 }
 ```
@@ -114,6 +133,8 @@ Common workflows:
 - `yarn test` – run Vitest + Supertest suite.
 - `yarn lint` – run ESLint.
 - `yarn build` – compile to `dist/` for production.
+- `yarn db:migrate` – apply Prisma migrations to the database referenced by `DATABASE_URL`.
+- `yarn db:seed` – run `prisma/seed.ts` to upsert the four deterministic admin users and roles.
 
 ---
 
@@ -126,17 +147,24 @@ server-strategy/
     server.ts           # HTTP server bootstrap (listens on PORT)
     routes/
       authRoutes.ts     # /auth/send-code, /auth/verify-code, /auth/me
-      adminRoutes.ts    # /admin/users listing (read-only)
+      adminRoutes.ts    # /admin/users listing (read-only, now DB-backed)
     auth/
       validation.ts     # Hand-rolled validators for auth payloads
       codeStore.ts      # In-memory verification code store (MVP)
     admin/
-      inMemoryUsersStore.ts # Temporary in-memory admin users catalog
+      usersRepository.ts # Prisma-backed repository for admin users listing
+    db/
+      prisma.ts         # Singleton PrismaClient wired to DATABASE_URL
     types/
       admin.ts          # UsersListResponse type
     __tests__/
       authRoutes.test.ts  # Integration tests for the /auth endpoints
       adminUsersRoutes.test.ts # Integration test for /admin/users
+  prisma/
+    schema.prisma       # Users/Roles schema definition
+    seed.ts             # Deterministic seed for roles + admin users
+    migrations/         # Prisma migration history (init schema)
+  prisma.config.ts      # Prisma CLI configuration (datasource URL + migration path)
   tsconfig.json
   tsconfig.build.json
   vitest.config.ts
@@ -162,8 +190,8 @@ Current coverage:
   - Exercises `/auth/send-code`, `/auth/verify-code`, `/auth/me`.
   - Asserts HTTP status codes and `Result<T>` shapes using shared DTOs.
 - `src/__tests__/adminUsersRoutes.test.ts`
-  - Exercises `/admin/users` read-only listing backed by the in-memory store.
-  - Verifies the response uses the shared `Result<UsersListResponse>` contract.
+  - Exercises `/admin/users` read-only listing backed by Prisma.
+  - Mocks repository interactions to verify success + DB error paths return the correct `Result<UsersListResponse>` shape.
 
 `yarn test` must be green before merging.
 

@@ -66,15 +66,15 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
   - `/auth/send-code`, `/auth/verify-code`, `/auth/me` endpoints.
 - **Admin tooling support**
   - Read-only Users listing via `GET /admin/users` for `internal-tool-strategy`.
-  - Currently backed by an in-memory catalog; will migrate to PostgreSQL once available.
+  - Backed by PostgreSQL via Prisma with deterministic seed data for internal users/roles.
 
 - **Core business APIs** (later)
   - Domain-specific operations for the product (to be defined).
   - Will reuse DTOs from `common-strategy`.
 
 - **Persistence**
-  - Access to PostgreSQL (later; currently using in-memory storage for verification codes and admin users).
-  - Data access layer and migrations.
+  - PostgreSQL + Prisma for users and roles (migrations + seeds live under `prisma/`, config in `prisma.config.ts`).
+  - OTP verification codes remain in-memory until the auth domain is persisted.
 
 - **Contracts & error model**
   - Uses `Result<T>` and `ApiError` from `common-strategy`.
@@ -103,9 +103,9 @@ We are building a **multi-service, multi-app architecture** with 6 main reposito
 **Current Admin Implementation (MVP)**:
 
 - `GET /admin/users`
-  - Returns `Result<UsersListResponse>` powered by the in-memory admin catalog.
-  - Intended for the internal-tool-strategy UI to display user metadata.
-  - Read-only for now; authZ and PostgreSQL persistence are future work.
+  - Returns `Result<UsersListResponse>` backed by PostgreSQL via Prisma.
+  - Seeds live in `prisma/seed.ts` and create four deterministic internal users + roles.
+  - Read-only for now; authZ and extended admin flows remain future work.
 
 ---
 
@@ -121,7 +121,7 @@ For `server-strategy` specifically:
 
 - **Integration tests** (already started):
   - `/auth/...` endpoints via Supertest + Vitest.
-  - `/admin/users` read-only listing backed by the in-memory store.
+  - `/admin/users` read-only listing backed by Prisma (repository mocked in tests to avoid DB dependency).
   - Assert HTTP status codes and response shapes using shared DTOs from `common-strategy`.
 
 All PRs should keep:
@@ -155,6 +155,9 @@ If this file and Confluence ever disagree, **Confluence is the source of truth**
   - Prefer to first define/update DTOs in `common-strategy`.
   - Then implement endpoints here using those DTOs.
   - Add/extend integration tests to cover success and failure paths.
+- When persisting or reading user/role data:
+  - Reuse the Prisma models defined in `prisma/schema.prisma`.
+  - Add migrations via `yarn db:migrate` and keep seeds in `prisma/seed.ts` updated.
 - When changing contracts:
   - Update `common-strategy`, this repo, and affected clients (`web-client`, `mobile-client`).
   - Update Confluence under `05 – APIs & Contracts`.
